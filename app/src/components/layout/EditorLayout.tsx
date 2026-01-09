@@ -3,9 +3,11 @@ import { Canvas } from '../canvas/Canvas';
 import { Sidebar } from '../panels/Sidebar';
 import { Inspector } from '../panels/Inspector';
 import { LayersPanel } from '../panels/LayersPanel';
-import { Settings, Layers } from 'lucide-react';
+import { StrokeReplay } from '../panels/StrokeReplay';
+// ... imports
+import { Settings, Layers, PlayCircle } from 'lucide-react';
 
-type RightTab = 'inspector' | 'layers';
+type RightTab = 'inspector' | 'layers' | 'replay';
 
 export const EditorLayout: React.FC = () => {
   const [rightTab, setRightTab] = useState<RightTab>('inspector');
@@ -33,12 +35,20 @@ export const EditorLayout: React.FC = () => {
             onClick={() => setRightTab('layers')}
           >
             <Layers size={14} />
-            Style Layers
+            Layers
+          </button>
+          <button
+            className={`right-tab ${rightTab === 'replay' ? 'active' : ''}`}
+            onClick={() => setRightTab('replay')}
+          >
+            <PlayCircle size={14} />
+            Replay
           </button>
         </div>
         <div className="right-content">
           {rightTab === 'inspector' && <Inspector />}
           {rightTab === 'layers' && <LayersPanel />}
+          {rightTab === 'replay' && <StrokeReplay />}
         </div>
       </div>
       <style>{`

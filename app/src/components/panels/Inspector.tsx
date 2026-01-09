@@ -3,11 +3,65 @@ import { useProjectStore } from '../../store/project';
 import { Minus, Plus } from 'lucide-react';
 
 export const Inspector: React.FC = () => {
-    const { stack, selection, updateNode } = useProjectStore();
+    const { stack, selection, updateNode, strokeSettings, setStrokeSettings } = useProjectStore();
     const selectedNode = stack.find(n => n.id === selection);
 
     if (!selectedNode) {
-        return <div className="inspector-empty">No selection</div>;
+        return (
+            <div className="inspector">
+                <div className="header">
+                    <h3>Global Settings</h3>
+                </div>
+                <div className="content">
+                    <div className="field">
+                        <label>Simplification Tolerance</label>
+                        <div className="numeric-input">
+                            <input
+                                type="range"
+                                min="0.1"
+                                max="10"
+                                step="0.1"
+                                value={strokeSettings.simplifyTolerance}
+                                onChange={e => setStrokeSettings({ simplifyTolerance: parseFloat(e.target.value) })}
+                            />
+                            <span className="slider-value">{strokeSettings.simplifyTolerance}</span>
+                        </div>
+                    </div>
+                    <div className="field">
+                        <label>Smoothing Iterations</label>
+                        <div className="numeric-input">
+                            <button
+                                onClick={() => setStrokeSettings({ smoothIterations: Math.max(0, strokeSettings.smoothIterations - 1) })}
+                            >
+                                <Minus size={12} />
+                            </button>
+                            <span className="slider-value" style={{ flex: 1, textAlign: 'center' }}>
+                                {strokeSettings.smoothIterations}
+                            </span>
+                            <button
+                                onClick={() => setStrokeSettings({ smoothIterations: Math.min(5, strokeSettings.smoothIterations + 1) })}
+                            >
+                                <Plus size={12} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <style>{`
+                    .inspector { padding: 12px; overflow-y: auto; }
+                    .header { margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+                    .header h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+                    .content { display: flex; flex-direction: column; gap: 12px; }
+                    .field label { display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+                    .numeric-input { display: flex; align-items: center; gap: 8px; }
+                    .numeric-input input[type="range"] { flex: 1; }
+                    .numeric-input button { 
+                        width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+                        background: var(--bg); border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+                    }
+                    .slider-value { font-size: 11px; font-family: var(--font-mono); min-width: 24px; text-align: right; }
+                 `}</style>
+            </div>
+        );
     }
 
     const handleChange = (key: string, value: any) => {

@@ -3,6 +3,7 @@ import { useProjectStore } from '../../store/project';
 import { Layers, Square, Circle, Scissors, Component, Trash2, Sparkles, Download, Hexagon, Star, Combine, ToggleLeft } from 'lucide-react';
 import { PresetsPanel } from './PresetsPanel';
 import { ExportPanel } from './ExportPanel';
+import { ApiKeySettings } from './ApiKeySettings';
 
 const IconMap: Record<string, React.ElementType> = {
     shape_rect: Square,
@@ -96,6 +97,7 @@ export const Sidebar: React.FC = () => {
             <div className="tab-content">
                 {activeTab === 'stack' && (
                     <>
+                        <ApiKeySettings />
                         <div className="header">
                             <div className="actions">
                                 <button onClick={() => handleAdd('shape_rect')} title="Rectangle"><Square size={14} /></button>
@@ -112,6 +114,16 @@ export const Sidebar: React.FC = () => {
                             <div className="actions">
                                 <button onClick={handleDelete} title="Delete" disabled={!selection}><Trash2 size={14} /></button>
                                 <button onClick={handleClearAll} title="Clear" className="danger">Clear</button>
+                            </div>
+                            <div className="actions" style={{ marginLeft: 'auto' }}>
+                                <button
+                                    onClick={() => useProjectStore.getState().aiBakeStrokes()}
+                                    title="AI Recognize & Bake"
+                                    style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                                    disabled={useProjectStore.getState().aiLoading}
+                                >
+                                    <Sparkles size={14} /> {useProjectStore.getState().aiLoading ? 'AI...' : 'AI Bake'}
+                                </button>
                             </div>
                         </div>
 

@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { useProjectStore } from '../../store/project';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { useProjectStore, type Stroke, type StrokePoint } from '../../store/project';
 import { useLayersStore, type StyleLayer } from '../../store/layers';
 import { evaluateStack } from '../../core/geometry';
 import { HandlesOverlay } from './HandlesOverlay';
+import { StrokesLayer } from './StrokesLayer';
 
 // Convert blend mode to CSS mix-blend-mode
 function blendModeToCss(bm: string): string {
@@ -303,9 +304,28 @@ function renderLayer(
 export const Canvas: React.FC = () => {
     const stack = useProjectStore(s => s.stack);
     const layers = useLayersStore(s => s.layers);
+    const addStroke = useProjectStore(s => s.addStroke);
+    const undo = useProjectStore(s => s.undo);
+    const redo = useProjectStore(s => s.redo);
+
+    // Zoom/Pan State
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
+
+    // Drawing State
+    const [isDrawing, setIsDrawing] = useState(false);
+    const currentStroke = useRef<Stroke>({
+        id: '',
+        points: [],
+        completed: false,
+        color: '#000',
+        width: 2
+    });
+
+    // Live stroke path for visualization during draw
+    const [livePath, setLivePath] = useState('');
+
     const [fillRule, setFillRule] = useState<'evenodd' | 'nonzero'>('evenodd');
     const lastMouse = useRef({ x: 0, y: 0 });
     const svgRef = useRef<SVGSVGElement>(null);
@@ -320,32 +340,100 @@ export const Canvas: React.FC = () => {
         }
     }, [stack]);
 
-    // Pan handling
-    const handleMouseDown = (e: React.MouseEvent) => {
+    // Helper to get consistent point from event
+    const getPoint = (e: React.PointerEvent | PointerEvent) => {
+        if (!svgRef.current) return { x: 0, y: 0, pressure: 0.5 };
+
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+
+        const rect = svgRef.current.getBoundingClientRect();
+        const x = (clientX - rect.left - pan.x) / zoom;
+        const y = (clientY - rect.top - pan.y) / zoom;
+
+        return {
+            x,
+            y,
+            pressure: e.pressure || 0.5,
+            time: Date.now()
+        };
+    };
+
+    // Main Pointer Handler
+    const handlePointerDown = (e: React.PointerEvent) => {
+        // Alt-click or Middle-click for pan
         if (e.button === 1 || (e.button === 0 && e.altKey)) {
             setIsPanning(true);
             lastMouse.current = { x: e.clientX, y: e.clientY };
             e.preventDefault();
+            return;
+        }
+
+        // Left click for drawing
+        if (e.button === 0) {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setIsDrawing(true);
+
+            const startPoint = getPoint(e);
+            currentStroke.current = {
+                id: Math.random().toString(36).substr(2, 9),
+                points: [startPoint],
+                completed: false,
+                color: '#3b82f6', // Blueprint blue
+                width: 2
+            };
+            setLivePath(`M ${startPoint.x} ${startPoint.y}`);
         }
     };
 
-    useEffect(() => {
-        const handleMove = (e: MouseEvent) => {
-            if (!isPanning) return;
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (isPanning) {
             const dx = e.clientX - lastMouse.current.x;
             const dy = e.clientY - lastMouse.current.y;
             setPan(p => ({ x: p.x + dx, y: p.y + dy }));
             lastMouse.current = { x: e.clientX, y: e.clientY };
-        };
-        const handleUp = () => setIsPanning(false);
+            return;
+        }
 
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMove);
-            window.removeEventListener('mouseup', handleUp);
-        };
-    }, [isPanning]);
+        if (isDrawing) {
+            const point = getPoint(e);
+            currentStroke.current.points.push(point);
+
+            // Optimization: Only update live path every few points or if distance is significant
+            // For now, raw update
+            setLivePath(prev => `${prev} L ${point.x} ${point.y}`);
+        }
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (isPanning) {
+            setIsPanning(false);
+            return;
+        }
+
+        if (isDrawing) {
+            setIsDrawing(false);
+            e.currentTarget.releasePointerCapture(e.pointerId);
+
+            if (currentStroke.current.points.length > 1) {
+                // Commit stroke to store
+                addStroke({
+                    ...currentStroke.current,
+                    completed: true
+                });
+            }
+
+            // Clear live path
+            setLivePath('');
+            currentStroke.current = {
+                id: '',
+                points: [],
+                completed: false,
+                color: '#000',
+                width: 2
+            };
+        }
+    };
 
     // Wheel zoom
     const handleWheel = (e: React.WheelEvent) => {
@@ -356,12 +444,25 @@ export const Canvas: React.FC = () => {
         }
     };
 
+    // Keyboard shortcuts for Undo/Redo
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                if (e.shiftKey) {
+                    redo();
+                } else {
+                    undo();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undo, redo]);
+
     return (
         <div
             className="canvas-wrapper"
             style={{ width: '100%', height: '100%', cursor: isPanning ? 'grabbing' : 'default' }}
-            onMouseDown={handleMouseDown}
-            onWheel={handleWheel}
         >
             {/* Toolbar */}
             <div className="canvas-toolbar">
@@ -370,6 +471,10 @@ export const Canvas: React.FC = () => {
                     <span className="zoom-label">{Math.round(zoom * 100)}%</span>
                     <button onClick={() => setZoom(z => z / 1.15)} title="Zoom Out">-</button>
                     <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset View">⌂</button>
+                </div>
+                <div className="toolbar-group">
+                    <button onClick={undo} title="Undo (Ctrl+Z)">↩</button>
+                    <button onClick={redo} title="Redo (Ctrl+Shift+Z)">↪</button>
                 </div>
                 <div className="toolbar-group">
                     <label className="fill-rule-toggle">
@@ -387,7 +492,12 @@ export const Canvas: React.FC = () => {
                 width="100%"
                 height="100%"
                 viewBox="0 0 1000 800"
-                style={{ background: '#fafbfc' }}
+                style={{ background: '#fafbfc', touchAction: 'none' }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                onWheel={handleWheel}
             >
                 <defs>
                     <pattern id="grid-major" width="80" height="80" patternUnits="userSpaceOnUse">
@@ -403,6 +513,22 @@ export const Canvas: React.FC = () => {
                 <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
                     {/* Render layers in order (bottom to top) */}
                     {layers.map((layer, idx) => renderLayer(layer, svgPath, idx))}
+
+                    {/* Strokes Layer - Rendered on top of geometry but below handles */}
+                    <StrokesLayer zoom={zoom} pan={pan} />
+
+                    {/* Live Stroke (currently being drawn) */}
+                    {isDrawing && livePath && (
+                        <path
+                            d={livePath}
+                            fill="none"
+                            stroke={currentStroke.current.color}
+                            strokeWidth={currentStroke.current.width}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            opacity={0.6}
+                        />
+                    )}
 
                     {/* Handles Overlay */}
                     <HandlesOverlay zoom={zoom} pan={pan} />
@@ -473,3 +599,4 @@ export const Canvas: React.FC = () => {
         </div>
     );
 };
+
