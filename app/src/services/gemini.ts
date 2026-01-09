@@ -49,7 +49,7 @@ export async function recognizeStrokes(strokes: Stroke[]): Promise<OperationNode
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.0-pro' });
 
     const strokeData = serializeStrokes(strokes);
     const userPrompt = `Analyze these freehand strokes and return JSON array of detected shapes:\n\n${strokeData}`;

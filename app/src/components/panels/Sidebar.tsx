@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useProjectStore } from '../../store/project';
-import { Layers, Square, Circle, Scissors, Component, Trash2, Sparkles, Download, Hexagon, Star, Combine, ToggleLeft } from 'lucide-react';
+import { Layers, Square, Circle, Scissors, Component, Trash2, Sparkles, Download, Hexagon, Star, Combine, ToggleLeft, Bot } from 'lucide-react';
 import { PresetsPanel } from './PresetsPanel';
 import { ExportPanel } from './ExportPanel';
-import { ApiKeySettings } from './ApiKeySettings';
+import { AISettingsPanel } from './AISettingsPanel';
 
 const IconMap: Record<string, React.ElementType> = {
     shape_rect: Square,
@@ -17,7 +17,7 @@ const IconMap: Record<string, React.ElementType> = {
     default: Layers
 };
 
-type TabId = 'stack' | 'presets' | 'export';
+type TabId = 'stack' | 'presets' | 'export' | 'ai';
 
 export const Sidebar: React.FC = () => {
     const { stack, selection, setSelection, addNode, removeNode } = useProjectStore();
@@ -73,23 +73,34 @@ export const Sidebar: React.FC = () => {
                 <button
                     className={`tab ${activeTab === 'stack' ? 'active' : ''}`}
                     onClick={() => setActiveTab('stack')}
+                    title="Shape Stack"
                 >
                     <Layers size={14} />
-                    Stack
+                    <span>Stack</span>
                 </button>
                 <button
                     className={`tab ${activeTab === 'presets' ? 'active' : ''}`}
                     onClick={() => setActiveTab('presets')}
+                    title="Presets Library"
                 >
                     <Sparkles size={14} />
-                    Presets
+                    <span>Presets</span>
                 </button>
                 <button
                     className={`tab ${activeTab === 'export' ? 'active' : ''}`}
                     onClick={() => setActiveTab('export')}
+                    title="Export Options"
                 >
                     <Download size={14} />
-                    Export
+                    <span>Export</span>
+                </button>
+                <button
+                    className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('ai')}
+                    title="AI Settings"
+                >
+                    <Bot size={14} />
+                    <span>AI</span>
                 </button>
             </div>
 
@@ -97,7 +108,6 @@ export const Sidebar: React.FC = () => {
             <div className="tab-content">
                 {activeTab === 'stack' && (
                     <>
-                        <ApiKeySettings />
                         <div className="header">
                             <div className="actions">
                                 <button onClick={() => handleAdd('shape_rect')} title="Rectangle"><Square size={14} /></button>
@@ -119,10 +129,10 @@ export const Sidebar: React.FC = () => {
                                 <button
                                     onClick={() => useProjectStore.getState().aiBakeStrokes()}
                                     title="AI Recognize & Bake"
-                                    style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                                    className="ai-bake-btn"
                                     disabled={useProjectStore.getState().aiLoading}
                                 >
-                                    <Sparkles size={14} /> {useProjectStore.getState().aiLoading ? 'AI...' : 'AI Bake'}
+                                    <Bot size={14} /> {useProjectStore.getState().aiLoading ? 'AI...' : 'AI Bake'}
                                 </button>
                             </div>
                         </div>
@@ -148,6 +158,7 @@ export const Sidebar: React.FC = () => {
 
                 {activeTab === 'presets' && <PresetsPanel />}
                 {activeTab === 'export' && <ExportPanel />}
+                {activeTab === 'ai' && <AISettingsPanel />}
             </div>
 
             <style>{`
@@ -157,41 +168,46 @@ export const Sidebar: React.FC = () => {
           display: flex; 
           border-bottom: 1px solid var(--line); 
           padding: 0;
+          background: var(--bg);
         }
         .tab {
           flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
-          padding: 12px 8px;
+          gap: 5px;
+          padding: 10px 6px;
           background: transparent;
           border: none;
           border-bottom: 2px solid transparent;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 500;
           color: var(--text-muted);
           cursor: pointer;
           transition: all 0.15s ease;
         }
-        .tab:hover { background: var(--bg); color: var(--text); }
+        .tab span { display: none; }
+        @media (min-width: 400px) {
+          .tab span { display: inline; }
+        }
+        .tab:hover { background: var(--panel); color: var(--text); }
         .tab.active { 
           color: var(--accent); 
           border-bottom-color: var(--accent);
-          background: var(--accent-bg);
+          background: var(--panel);
         }
 
         .tab-content { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
 
         .header { 
-          padding: 12px; 
+          padding: 10px; 
           border-bottom: 1px solid var(--line); 
           display: flex; 
+          flex-wrap: wrap;
           align-items: center; 
-          justify-content: space-between; 
-          gap: 8px;
+          gap: 6px;
         }
-        .actions { display: flex; gap: 4px; }
+        .actions { display: flex; gap: 3px; }
         .actions button { 
           padding: 6px; 
           background: transparent; 
@@ -202,11 +218,21 @@ export const Sidebar: React.FC = () => {
           align-items: center;
           font-size: 11px;
           gap: 4px;
+          color: var(--text);
+          transition: all 0.15s ease;
         }
-        .actions button:hover { background: var(--bg); }
+        .actions button:hover { background: var(--bg); border-color: var(--line-strong); }
         .actions button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .actions button.danger { color: var(--danger); border-color: #fecaca; }
-        .actions button.danger:hover { background: #fff1f2; }
+        .actions button.danger { color: var(--danger); border-color: var(--danger); }
+        .actions button.danger:hover { background: var(--danger-bg); }
+        .actions .ai-bake-btn {
+          color: var(--accent);
+          border-color: var(--accent);
+          font-weight: 500;
+        }
+        .actions .ai-bake-btn:hover {
+          background: var(--accent-bg);
+        }
         
         .list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px; min-height: 0; }
         .empty { 

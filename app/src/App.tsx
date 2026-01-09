@@ -2,6 +2,10 @@ import React from 'react';
 import './styles/base.css';
 import { EditorLayout } from './components/layout/EditorLayout';
 import { useProjectStore } from './store/project';
+import { initTheme } from './store/settings';
+
+// Initialize theme before render
+initTheme();
 
 function App() {
   // Initialize some test data if empty
@@ -37,3 +41,4 @@ function App() {
 }
 
 export default App;
+
